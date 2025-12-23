@@ -1,0 +1,456 @@
+{
+  "name": "Linkedin Daily Post Manager",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1232,
+        -48
+      ],
+      "id": "9571c522-24d6-4c83-b234-7f0490fb2a85",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst maxKeywords = 5;\nfunction clean(s){ return s ? s.trim() : \"\"; }\n\n// collect\nconst topic = clean(row.Topic);\nconst keywords = clean(row.Keywords).split(',').map(k => k.trim()).filter(Boolean).slice(0, maxKeywords);\n\n// build parts\nconst parts = [];\nif (topic) parts.push(`\"${topic.replace(/\"/g,'')}\"`);\nfor (const k of keywords) {\n  if (k.indexOf(' ')>=0) parts.push(`\"${k.replace(/\"/g,'')}\"`);\n  else parts.push(k.replace(/\"/g,''));\n}\n\n// join with OR (broad search) but prefer grouping\nlet q = parts.join(' OR ');\nif (!q) q = topic || 'education technology';\n\n// ensure under 200 chars\nif (q.length > 190) q = q.slice(0,190);\n\n// url encode\nreturn [{json: { q: q}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        -48
+      ],
+      "id": "1c431def-4151-43e8-b326-535efb3e33b4",
+      "name": "Build Query"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{$node[\"Build Query\"].json[\"q\"]}}"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "searchIn",
+              "value": "title,description,content"
+            },
+            {
+              "name": "sortBy",
+              "value": "relevance"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        -48
+      ],
+      "id": "88816d39-88bb-4691-9040-1f9a5f36139c",
+      "name": "News Search"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a precision filtering assistant. Your task is to analyze article descriptions and a list of interest notes, then identify which articles are most relevant. You excel at understanding semantic meaning, not just keywords. For example, an article about a \"student altercation\" is highly relevant to a note about \"school safety.\"\n\nYou MUST return ONLY the indices (0-9) of the top 3 most relevant articles as a JSON array. Do not include any other text or explanations.\n### INSTRUCTIONS:\n1.  Below is a list of \"Interest Notes\" from my personal list.\n2.  Also below is a list of \"Articles\" from a news search.\n3.  Compare each article's `title` and `description` to all the \"Interest Notes.\"\n4.  Rank the articles by their overall relevance to any of the notes.\n5.  Return the top 3 most relevant articles as a JSON array.\n\n### INTEREST NOTES:\n{{$node[\"Google Sheets\"].json.Notes}}\n// n8n Expression to get all values from the 'notes' column\n\n### ARTICLES:\n{{\n  $json.articles.map((article, index) => \n    `Index: ${index}\\nTitle: ${article.title}\\nDescription: ${article.description}`\n  ).join('\\n---\\n')\n}}\n// n8n Expression to pass the entire array of 10 articles from the previous node\n\n### OUTPUT:",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        -432,
+        -48
+      ],
+      "id": "16bf6a5b-8296-4284-b881-b2e33225a853",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        128
+      ],
+      "id": "3344bcc4-4fa5-49b2-8449-1fdfa723d4e9",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1JJy2SUevnmEzMXOeY1QO6aAji8Ma99DzpcWST_3wn-g",
+          "mode": "list",
+          "cachedResultName": "Linkedin Content",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JJy2SUevnmEzMXOeY1QO6aAji8Ma99DzpcWST_3wn-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JJy2SUevnmEzMXOeY1QO6aAji8Ma99DzpcWST_3wn-g/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Date",
+              "lookupValue": "={{$now.format('yyyy-MM-dd')}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1024,
+        -48
+      ],
+      "id": "ee4fd7d2-1b78-47f1-8b78-6862d688a83b",
+      "name": "Google Sheets",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const jsonString = $input.first().json.text;\n\n// Parse the JSON array from the string\nconst topIndices = JSON.parse(jsonString);\n\n// Get full articles from Article Search node  \nconst allArticles = $node[\"News Search\"].json.articles;\n\n// Return only the top articles\nreturn topIndices.map(index => allArticles[index]);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -48
+      ],
+      "id": "99c83469-3402-4bbb-9ced-616dee0aff66",
+      "name": "Link Response to Articles"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "kidus.dr.getachew@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Article Number",
+              "fieldType": "number",
+              "placeholder": "Enter article number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Content",
+              "placeholder": "Paste article content for post"
+            },
+            {
+              "fieldLabel": "Image URL",
+              "placeholder": "Paste image url"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        336,
+        -48
+      ],
+      "id": "02f45d25-7443-469f-984b-f5ae0762e610",
+      "name": "Send message and wait for response",
+      "webhookId": "c7606d7e-887d-476f-b87e-588024c11d37"
+    },
+    {
+      "parameters": {
+        "jsCode": "const articles = $input.all();\n\nlet htmlContent = `\n<h2>Please select one of the following articles:</h2>\n<br>\n`;\n\narticles.forEach((article, index) => {\n  const articleNum = index + 1;\n  htmlContent += `\n  <div style=\"border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;\">\n    <h3>Option ${articleNum}:</h3>\n    <p><strong>Title:</strong> ${article.json.title || 'No title'}</p>\n    <p><strong>Description:</strong> ${article.json.description || 'No description'}</p>\n    <p><strong>Source:</strong> ${article.json.source?.name || 'Unknown source'}</p>\n    <p><strong>Published:</strong> ${article.json.publishedAt ? new Date(article.json.publishedAt).toLocaleDateString() : 'Unknown date'}</p>\n    <p><strong>URL:</strong> <a href=\"${article.json.url}\">Read full article</a></p>\n  </div>\n  <br>\n  `;\n});\n\nhtmlContent += `\n<p>Please reply to this email with the number of your choice (1, 2, or 3).</p>\n<p><em>This is an automated message. Your response will trigger the next step in the workflow.</em></p>\n`;\n\nreturn [{\n  json: {\n    subject: `Article Selection Required - ${new Date().toLocaleDateString()}`,\n    html: htmlContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -48
+      ],
+      "id": "7c6dd58d-7341-489a-92bf-c014c8781375",
+      "name": "Format Email Content"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n// Extract the choice from the simple response format\nconst userChoice = response.data[\"Article Number\"];\nconst selectedNumber = parseInt(userChoice);\nconst newContent = response.data.Content;\nlet selectedIndex = null;\nlet selectedArticle = null;\n\n// Validate the response\nif ([1, 2, 3].includes(selectedNumber)) {\n  selectedIndex = selectedNumber - 1; // Convert to 0-based index\n}\n\n// Get the original articles from the previous nodes\n// You may need to adjust the index based on your actual workflow\nconst originalArticles = $('Link Response to Articles').all();\n\nif (selectedIndex !== null && originalArticles[selectedIndex]) {\n  selectedArticle = {\n    ...originalArticles[selectedIndex].json, // Copy all original properties\n    content: newContent\n  };\n}\n\nreturn [{\n  json: {\n    selectedIndex: selectedIndex,\n    selectedNumber: selectedNumber,\n    isValidChoice: selectedIndex !== null && selectedIndex >= 0 && selectedIndex <= 2,\n    selectedArticle: selectedArticle,\n    responseTimestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -48
+      ],
+      "id": "211313dc-28dd-40ff-99cf-eca63f70fbbb",
+      "name": "Parse Email Response"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert LinkedIn content writer specialized in edtech. Write one LinkedIn post following this exact structure. Use plain, human language, short paragraphs, and vary style across days (story, tip-list, or insight). Keep it concise (target 120–220 words). Use personal pronouns and a single clear key takeaway.\n\nInputs:\n\nAuthor: {{ $json.selectedArticle.author }}\n\nTarget Audience of Post: {{ $node['Google Sheets'].json.Audience }}\n\nArticle title: {{ $json.selectedArticle.title }}\n\nArticle description: {{ $json.selectedArticle.description }}\n\nArticle URL: {{ $json.selectedArticle.url }}\n\nContent: {{ $json.selectedArticle.content }}\n\nOutput (must be a JSON object, nothing else):\n{\n\"content\":{\n  \"hook\": \"<1–2 line engaging hook>\",\n  \"body\": \"<main post body: focus on the overarching lesson/insight from the article. Present as someone who researched/read about this topic, not experienced it firsthand. Cite the article as an example of the broader principle>\",\n  \"key_message\": \"<single-sentence core message about the educational principle>\",\n  \"hashtags\": [\"#edtech\",\"#AIinEducation\", \"... up to 5\"]\n},\n\"style_choice\": \"<Story | Tips | Insight | Practical Application Style | Future Trends Style>\"\n}\n\nCRITICAL CONSTRAINTS:\n\nNever write as if you personally experienced the thing - you read/researched about it\n\nFocus on the overarching principle first, then mention the article as an example\n\nAvoid marketing language - be analytical and insightful, not promotional\n\nNever invent direct quotes or statistics not in the article\n\nVary style across invocations\n\nWhen citing the article, use phrases like: \"I came across research showing...\", \"According to [source]...\", \"An interesting example I found...\"",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        752,
+        -48
+      ],
+      "id": "94ef9c1e-388e-413e-ab91-359037e2c7f3",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        752,
+        144
+      ],
+      "id": "17275f40-6acb-4274-a237-17797527f65a",
+      "name": "Groq Chat Model1"
+    },
+    {
+      "parameters": {
+        "person": "w53dHdYuZC",
+        "text": "={{ $json.linkedin_post }}",
+        "shareMediaCategory": "IMAGE",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        -48
+      ],
+      "id": "9f443ae3-face-4d89-a129-f67d118d2e00",
+      "name": "Create a post"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input: LLM result is in items[0].json.text as a JSON string\nconst raw = $input.first().json.text;\n\n// Parse safely\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Failed to parse LLM JSON: \" + e.message);\n}\n\nconst content = parsed.content;\n\n// Build the LinkedIn post\nconst hook = content.hook || \"\";\nconst body = content.body || \"\";\nconst keyMessage = content.key_message || \"\";\nconst hashtags = Array.isArray(content.hashtags)\n  ? content.hashtags.join(\" \")\n  : \"\";\n\n// Final LinkedIn-ready text\nconst formatted = `${hook}\n\n${body}\n\n${keyMessage}\n\n${hashtags}`;\n\nreturn [\n  {\n    json: {\n      linkedin_post: formatted\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        -48
+      ],
+      "id": "2bf580d0-c400-481f-ab0d-11f22f3d6603",
+      "name": "Format Text for Linkedin"
+    },
+    {
+      "parameters": {
+        "url": "={{ $node['Send message and wait for response'].json.data[\"Image URL\"] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1312,
+        -48
+      ],
+      "id": "af499c79-ba42-4e39-a0be-f5133525bed7",
+      "name": "Get Final Image To Post"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Query": {
+      "main": [
+        [
+          {
+            "node": "News Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News Search": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Link Response to Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link Response to Articles": {
+      "main": [
+        [
+          {
+            "node": "Format Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "Parse Email Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email Response": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Format Text for Linkedin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Text for Linkedin": {
+      "main": [
+        [
+          {
+            "node": "Get Final Image To Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Final Image To Post": {
+      "main": [
+        [
+          {
+            "node": "Create a post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0e76b1ca-26e9-427f-a1b0-beae8bb92d17",
+  "id": "wpHEtFqIBUONGUI8",
+  "tags": []
+}
