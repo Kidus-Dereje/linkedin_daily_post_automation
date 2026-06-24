@@ -21,19 +21,32 @@ Trigger: Manual execution or schedule trigger
 
 Data Source: Google Sheets (content calendar with topics, keywords, audience, notes)
 
-Article Search: NewsAPI for fetching relevant articles
+Query Builder: Code node that constructs a NewsAPI query from topic/keywords with OR logic, phrase quoting, and 190-char limit
 
-AI Filtering: Groq LLM for relevance scoring
+Article Search: NewsAPI `/v2/everything` returning 10 articles sorted by relevance
 
-Human Approval: Email interface for article selection
+AI Relevance Filter: Groq LLM that scores articles against your interest notes and returns the top 3 indices
 
-Content Creation: LLM-powered LinkedIn post generation
+Article Linker: Code node that maps LLM-selected indices back to full article objects
 
-Publishing: LinkedIn API integration with image support
+Email Formatter: Code node generating an HTML email with article options (title, description, source, URL)
+
+Human Approval: Gmail `sendAndWait` node with custom form fields (Article Number, Content, Image URL)
+
+Response Parser: Code node that validates the user's form submission and extracts selected article + custom content
+
+Content Generation: LLM-powered LinkedIn post creation (hook, body, key message, hashtags)
+
+Post Formatter: Code node that structures LLM output into a ready-to-publish LinkedIn post
+
+Image Fetcher: HTTP Request node that downloads the user-provided image URL before posting
+
+Publishing: LinkedIn API integration with IMAGE media category
 
 Node Flow
 text
-Google Sheets → Query Builder → NewsAPI → AI Filtering → Email Selection → Content Generation → LinkedIn Post
+Google Sheets → Build Query → NewsAPI → Basic LLM Chain (filtering) → Link Response to Articles → Format Email Content → Send message and wait for response → Parse Email Response → Basic LLM Chain1 (post gen) → Format Text for Linkedin → Get Final Image To Post → Create a post
+
 🚀 Setup Instructions
 Prerequisites
 n8n Account: Self-hosted or cloud instance
@@ -117,6 +130,8 @@ LinkedIn: Update Person URN to your profile ID
 
 Gmail: Configure sender email and OAuth
 
+5. Activate the workflow (toggle in n8n) — imported workflows start inactive
+
 📅 Daily Operation
 Content Calendar Management
 Plan Ahead: Populate your Google Sheet with daily topics
@@ -128,15 +143,15 @@ Audience Targeting: Specify target audience for personalized content
 Daily Workflow Execution
 Trigger: Execute manually or set up schedule trigger
 
-Article Selection: Receive email with 3 article options
+Article Selection: Receive email with 3 article options and 3 form fields
 
-Provide Content: Reply with:
+Respond via Form: Fill out the embedded form fields (not a plain reply):
 
-Article number (1-3)
+Article Number (1-3) — required
 
-Optional: Custom content/text
+Content — optional, paste your own article text if the LLM summary needs replacement
 
-Optional: Image URL for the post
+Image URL — optional, provide a public URL for the post image
 
 Automated Publishing: Workflow handles the rest
 
@@ -162,13 +177,17 @@ Changing the number of articles returned (currently top 3)
 Adjusting relevance criteria in your interest notes
 
 Query Building
-The "Build Query" node can be modified to:
+The "Build Query" node:
 
-Change number of keywords (currently 5 max)
+Takes up to 5 keywords from your sheet, multi-word phrases get double-quoted
 
-Adjust search query logic
+Joins all terms with OR (broad search)
 
-Modify news sources or languages
+Falls back to the Topic column (or `education technology`) if no keywords exist
+
+Enforces a 190-character max to stay within NewsAPI limits
+
+Customizable: change `maxKeywords`, quoting strategy, join operator, or fallback text
 
 🛠️ Technical Details
 Nodes Used
@@ -179,18 +198,18 @@ LangChain: ChainLlm, LmChatGroq
 Community: LinkedIn
 
 Key Code Snippets
-Query Builder (Build Query node)
-javascript
-// Builds NewsAPI query from topics and keywords
-// Handles quotes, OR logic, and character limits
-Email Formatter (Format Email Content node)
-javascript
-// Creates HTML email with article options
-// Includes titles, descriptions, and source information
-LinkedIn Formatter (Format Text for Linkedin node)
-javascript
-// Structures LLM output into LinkedIn post format
-// Combines hook, body, key message, and hashtags
+Query Builder (Build Query node — constructs NewsAPI query from topic/keywords with OR logic, phrase quoting, 190-char limit)
+
+Email Formatter (Format Email Content node — HTML email with article options and form fields)
+
+Response Parser (Parse Email Response node — validates Article Number [1-3], maps to article index, preserves custom content)
+
+Post Formatter (Format Text for Linkedin node — structures LLM output: hook, body, key message, hashtags)
+
+NewsAPI Request Details
+- Endpoint: `/v2/everything`
+- Parameters: `q` (built by Query Builder), `language=en`, `pageSize=10`, `searchIn=title,description,content`, `sortBy=relevance`
+- Authentication: HTTP Header Auth with your NewsAPI key
 🔒 Security & Best Practices
 API Security
 Use Environment Variables for all API keys
@@ -291,4 +310,4 @@ Google API services terms
 Groq usage policies
 
 *Built with n8n - The extendable workflow automation tool.*
-Last Updated: 23/12/2025
+Last Updated: 24/06/2026
