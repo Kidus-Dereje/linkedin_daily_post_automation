@@ -99,17 +99,17 @@
       "parameters": {
         "documentId": {
           "__rl": true,
-          "value": "1JJy2SUevnmEzMXOeY1QO6aAji8Ma99DzpcWST_3wn-g",
+          "value": "YOUR_DOCUMENT_ID",
           "mode": "list",
           "cachedResultName": "Linkedin Content",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JJy2SUevnmEzMXOeY1QO6aAji8Ma99DzpcWST_3wn-g/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_DOCUMENT_ID/edit?usp=drivesdk"
         },
         "sheetName": {
           "__rl": true,
           "value": "gid=0",
           "mode": "list",
           "cachedResultName": "Sheet1",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JJy2SUevnmEzMXOeY1QO6aAji8Ma99DzpcWST_3wn-g/edit#gid=0"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_DOCUMENT_ID/edit#gid=0"
         },
         "filtersUI": {
           "values": [
@@ -147,7 +147,7 @@
     {
       "parameters": {
         "operation": "sendAndWait",
-        "sendTo": "kidus.dr.getachew@gmail.com",
+        "sendTo": "your-email@example.com",
         "subject": "={{ $json.subject }}",
         "message": "={{ $json.html }}",
         "responseType": "customForm",
@@ -181,7 +181,7 @@
       ],
       "id": "02f45d25-7443-469f-984b-f5ae0762e610",
       "name": "Send message and wait for response",
-      "webhookId": "c7606d7e-887d-476f-b87e-588024c11d37"
+      "webhookId": "CHANGE_ME"
     },
     {
       "parameters": {
@@ -240,7 +240,7 @@
     },
     {
       "parameters": {
-        "person": "w53dHdYuZC",
+        "person": "YOUR_PERSON_URN",
         "text": "={{ $json.linkedin_post }}",
         "shareMediaCategory": "IMAGE",
         "additionalFields": {}
